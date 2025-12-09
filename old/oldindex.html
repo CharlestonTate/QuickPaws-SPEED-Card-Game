@@ -1,0 +1,733 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Speed Card Game</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: Arial, sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 0;
+            margin: 0;
+            overflow: hidden;
+        }
+        
+        .start-menu {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 20px;
+            margin-top: 50px;
+        }
+        
+        .start-menu h1 {
+            font-size: 48px;
+        }
+        
+        .start-menu button {
+            padding: 15px 40px;
+            font-size: 24px;
+        }
+        
+        .game-container {
+            display: none;
+        }
+        
+        .game-container.active {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            width: 100%;
+            height: 100vh;
+            position: relative;
+        }
+        
+        .game-area {
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            width: 100%;
+            height: 100%;
+            position: relative;
+        }
+        
+        .card {
+            width: 120px;
+            height: 180px;
+            border: 3px solid #000;
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 36px;
+            font-weight: bold;
+            cursor: grab;
+            background: white;
+            user-select: none;
+            transition: transform 0.15s ease;
+        }
+        
+        .card:active {
+            cursor: grabbing;
+        }
+        
+        .card:hover {
+            background: #f0f0f0;
+        }
+        
+        .card.disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+        
+        .card.drag-over {
+            background: #d0d0d0;
+            border-color: #00f;
+        }
+        
+        .card.center-pile {
+            cursor: default;
+            width: 160px;
+            height: 240px;
+            font-size: 48px;
+        }
+        
+        .card.center-pile:hover {
+            background: white;
+        }
+        
+        .card.deck-pile {
+            width: 160px;
+            height: 240px;
+            font-size: 24px;
+            cursor: default;
+        }
+        
+        .card.deck-pile:hover {
+            background: white;
+        }
+        
+        .card.placed {
+            animation: cardPlace 0.2s ease;
+        }
+        
+        .card.flipped {
+            animation: cardFlip 0.25s ease;
+        }
+        
+        @keyframes cardPlace {
+            0% {
+                transform: scale(1.15);
+            }
+            100% {
+                transform: scale(1);
+            }
+        }
+        
+        @keyframes cardFlip {
+            0% {
+                transform: rotateY(90deg) scale(0.8);
+            }
+            100% {
+                transform: rotateY(0deg) scale(1);
+            }
+        }
+        
+        body.dragging,
+        body.dragging * {
+            cursor: grabbing !important;
+        }
+        
+        .pile {
+            display: flex;
+            gap: 15px;
+            align-items: center;
+            justify-content: center;
+            width: 100%;
+            padding: 20px 0;
+        }
+        
+        .pile.cpu-pile {
+            position: absolute;
+            top: 20px;
+            left: 0;
+            right: 0;
+        }
+        
+        .pile.player-pile {
+            position: absolute;
+            bottom: 20px;
+            left: 0;
+            right: 0;
+        }
+        
+        .pile-label {
+            font-size: 18px;
+            margin-right: 10px;
+            min-width: 100px;
+        }
+        
+        .card-container {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 5px;
+        }
+        
+        .indicator {
+            font-size: 20px;
+            height: 20px;
+            visibility: hidden;
+        }
+        
+        .indicator.active {
+            visibility: visible;
+        }
+        
+        .center-piles {
+            display: flex;
+            gap: 20px;
+            justify-content: center;
+            align-items: center;
+            width: 110%;
+            padding-left: 50px;
+            padding-right: 50px;
+            position: absolute;
+            top: 50%;
+            left: 0;
+            right: 0;
+            transform: translateY(-50%);
+        }
+        
+        .center-piles-inner {
+            display: flex;
+            gap: 20px;
+            align-items: center;
+        }
+        
+        .player-hand {
+            display: flex;
+            gap: 15px;
+        }
+        
+        button {
+            padding: 12px 24px;
+            font-size: 18px;
+            cursor: pointer;
+            border: 2px solid #000;
+            background: white;
+            border-radius: 8px;
+        }
+        
+        button:hover {
+            background: #f0f0f0;
+        }
+        
+        #newGame {
+            position: fixed;
+            bottom: 20px;
+            left: 20px;
+            z-index: 1000;
+        }
+        
+        .status {
+            display: none;
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            font-size: 24px;
+            font-weight: 600;
+            padding: 30px 50px;
+            background: white;
+            border: 3px solid #000;
+            border-radius: 12px;
+            box-shadow: 0 8px 16px rgba(0,0,0,0.3);
+            z-index: 999;
+        }
+        
+        .status.show {
+            display: block;
+        }
+    </style>
+</head>
+<body>
+    <div class="start-menu" id="startMenu">
+        <h1>Speed</h1>
+        <button id="startButton">Start Game</button>
+    </div>
+    
+    <div class="game-container" id="gameContainer">
+        <div class="status" id="status">Get ready!</div>
+        <button id="newGame">New Game</button>
+        
+        <div class="game-area">
+            <div class="pile cpu-pile">
+                <span class="pile-label">CPU Hand:</span>
+                <div class="player-hand" id="cpuHand"></div>
+            </div>
+            
+            <div class="center-piles">
+                <div class="card deck-pile" id="draw1">DECK</div>
+                <div class="card center-pile" id="pile1"></div>
+                <div class="card center-pile" id="pile2"></div>
+                <div class="card deck-pile" id="draw2">DECK</div>
+            </div>
+            
+            <div class="pile player-pile">
+                <span class="pile-label">Your Hand:</span>
+                <div class="player-hand" id="playerHand"></div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Card Game System
+        class Deck {
+            constructor() {
+                this.cards = [];
+                this.reset();
+            }
+            
+            reset() {
+                this.cards = [];
+                const suits = ['♠', '♥', '♦', '♣'];
+                const values = ['A', '2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K'];
+                
+                for (let suit of suits) {
+                    for (let value of values) {
+                        this.cards.push({ value, suit, numValue: this.getNumValue(value) });
+                    }
+                }
+            }
+            
+            getNumValue(value) {
+                if (value === 'A') return 1;
+                if (value === 'J') return 11;
+                if (value === 'Q') return 12;
+                if (value === 'K') return 13;
+                return parseInt(value);
+            }
+            
+            shuffle() {
+                for (let i = this.cards.length - 1; i > 0; i--) {
+                    const j = Math.floor(Math.random() * (i + 1));
+                    [this.cards[i], this.cards[j]] = [this.cards[j], this.cards[i]];
+                }
+            }
+            
+            draw() {
+                return this.cards.pop();
+            }
+        }
+        
+        // Speed Game
+        class SpeedGame {
+            constructor() {
+                this.deck = new Deck();
+                this.playerHand = [];
+                this.cpuHand = [];
+                this.pile1 = null;
+                this.pile2 = null;
+                this.playerDrawPile = [];
+                this.cpuDrawPile = [];
+                this.centerDraw1 = [];
+                this.centerDraw2 = [];
+                this.gameActive = false;
+                this.cpuCardIndex = 0;
+                this.cpuInterval = null;
+                this.draggedCard = null;
+                this.draggedCardElement = null;
+                this.mouseX = 0;
+                this.mouseY = 0;
+            }
+            
+            start() {
+                // Clear any existing interval
+                if (this.cpuInterval) {
+                    clearInterval(this.cpuInterval);
+                    this.cpuInterval = null;
+                }
+                
+                // Hide status message
+                document.getElementById('status').classList.remove('show');
+                
+                this.deck.reset();
+                this.deck.shuffle();
+                
+                this.playerHand = [];
+                this.cpuHand = [];
+                this.playerDrawPile = [];
+                this.cpuDrawPile = [];
+                this.centerDraw1 = [];
+                this.centerDraw2 = [];
+                
+                // Each player gets 5 cards in hand
+                for (let i = 0; i < 5; i++) {
+                    this.playerHand.push(this.deck.draw());
+                    this.cpuHand.push(this.deck.draw());
+                }
+                
+                // Each player gets 15 cards in their draw pile
+                for (let i = 0; i < 15; i++) {
+                    this.playerDrawPile.push(this.deck.draw());
+                    this.cpuDrawPile.push(this.deck.draw());
+                }
+                
+                // Remaining 12 cards go to center draw piles (6 each)
+                for (let i = 0; i < 6; i++) {
+                    this.centerDraw1.push(this.deck.draw());
+                    this.centerDraw2.push(this.deck.draw());
+                }
+                
+                // Flip one card from each center pile to start
+                this.pile1 = this.centerDraw1.pop();
+                this.pile2 = this.centerDraw2.pop();
+                this.gameActive = true;
+                this.cpuCardIndex = 0;
+                
+                this.render();
+                this.startCPU();
+            }
+            
+            canPlay(card, pileCard) {
+                const diff = Math.abs(card.numValue - pileCard.numValue);
+                return diff === 1 || diff === 12; // Adjacent or wrap around (K-A)
+            }
+            
+            getClosestValidPile(card, x, y) {
+                const pile1El = document.getElementById('pile1');
+                const pile2El = document.getElementById('pile2');
+                
+                const pile1Rect = pile1El.getBoundingClientRect();
+                const pile2Rect = pile2El.getBoundingClientRect();
+                
+                const pile1CenterX = pile1Rect.left + pile1Rect.width / 2;
+                const pile1CenterY = pile1Rect.top + pile1Rect.height / 2;
+                const pile2CenterX = pile2Rect.left + pile2Rect.width / 2;
+                const pile2CenterY = pile2Rect.top + pile2Rect.height / 2;
+                
+                const dist1 = Math.sqrt(Math.pow(x - pile1CenterX, 2) + Math.pow(y - pile1CenterY, 2));
+                const dist2 = Math.sqrt(Math.pow(x - pile2CenterX, 2) + Math.pow(y - pile2CenterY, 2));
+                
+                const proximityThreshold = 200; // pixels
+                
+                let closestPile = null;
+                let closestDist = Infinity;
+                
+                if (dist1 < proximityThreshold && this.canPlay(card, this.pile1)) {
+                    closestPile = 1;
+                    closestDist = dist1;
+                }
+                
+                if (dist2 < proximityThreshold && this.canPlay(card, this.pile2)) {
+                    if (dist2 < closestDist) {
+                        closestPile = 2;
+                    }
+                }
+                
+                return closestPile;
+            }
+            
+            playCard(card, pileNum) {
+                const pileCard = pileNum === 1 ? this.pile1 : this.pile2;
+                
+                if (!this.canPlay(card, pileCard)) {
+                    return false;
+                }
+                
+                if (pileNum === 1) {
+                    this.pile1 = card;
+                } else {
+                    this.pile2 = card;
+                }
+                
+                const idx = this.playerHand.indexOf(card);
+                this.playerHand.splice(idx, 1);
+                
+                // Draw from player's own draw pile
+                if (this.playerDrawPile.length > 0) {
+                    this.playerHand.push(this.playerDrawPile.pop());
+                }
+                
+                this.render();
+                this.checkWin();
+                return true;
+            }
+            
+            cpuPlay() {
+                if (!this.gameActive || this.cpuHand.length === 0) return;
+                
+                const card = this.cpuHand[this.cpuCardIndex];
+                let played = false;
+                let pileNum = null;
+                
+                // Try pile 1 first
+                if (this.canPlay(card, this.pile1)) {
+                    this.pile1 = card;
+                    this.cpuHand.splice(this.cpuCardIndex, 1);
+                    
+                    // Draw from CPU's own draw pile
+                    if (this.cpuDrawPile.length > 0) {
+                        this.cpuHand.push(this.cpuDrawPile.pop());
+                    }
+                    
+                    played = true;
+                    pileNum = 1;
+                }
+                // Then try pile 2
+                else if (this.canPlay(card, this.pile2)) {
+                    this.pile2 = card;
+                    this.cpuHand.splice(this.cpuCardIndex, 1);
+                    
+                    // Draw from CPU's own draw pile
+                    if (this.cpuDrawPile.length > 0) {
+                        this.cpuHand.push(this.cpuDrawPile.pop());
+                    }
+                    
+                    played = true;
+                    pileNum = 2;
+                }
+                
+                if (played) {
+                    // Move to next slot after playing and replacing
+                    this.cpuCardIndex = (this.cpuCardIndex + 1) % this.cpuHand.length;
+                    this.render();
+                    this.animatePile(pileNum);
+                    this.checkWin();
+                } else {
+                    // Move to next card
+                    this.cpuCardIndex = (this.cpuCardIndex + 1) % this.cpuHand.length;
+                    this.render();
+                }
+                
+                // After checking all cards (wrapped back to 0), see if both players are stuck
+                if (this.cpuCardIndex === 0) {
+                    if (!this.canPlayerPlay() && !this.canCPUPlay() && this.centerDraw1.length > 0) {
+                        setTimeout(() => this.flipDrawPiles(), 500);
+                    }
+                }
+            }
+            
+            flipDrawPiles() {
+                if (this.centerDraw1.length > 0 && this.centerDraw2.length > 0) {
+                    this.pile1 = this.centerDraw1.pop();
+                    this.pile2 = this.centerDraw2.pop();
+                    this.cpuCardIndex = 0;
+                    this.render();
+                    this.animatePile(1, true);
+                    this.animatePile(2, true);
+                }
+            }
+            
+            animatePile(pileNum, isFlip = false) {
+                const pileEl = document.getElementById(`pile${pileNum}`);
+                const animClass = isFlip ? 'flipped' : 'placed';
+                pileEl.classList.add(animClass);
+                setTimeout(() => {
+                    pileEl.classList.remove(animClass);
+                }, isFlip ? 250 : 200);
+            }
+            
+            canPlayerPlay() {
+                for (let card of this.playerHand) {
+                    if (this.canPlay(card, this.pile1) || this.canPlay(card, this.pile2)) {
+                        return true;
+                    }
+                }
+                return false;
+            }
+            
+            canCPUPlay() {
+                for (let card of this.cpuHand) {
+                    if (this.canPlay(card, this.pile1) || this.canPlay(card, this.pile2)) {
+                        return true;
+                    }
+                }
+                return false;
+            }
+            
+            startCPU() {
+                this.cpuInterval = setInterval(() => {
+                    if (!this.gameActive) {
+                        clearInterval(this.cpuInterval);
+                        this.cpuInterval = null;
+                        return;
+                    }
+                    this.cpuPlay();
+                }, 600);
+            }
+            
+            checkWin() {
+                if (this.playerHand.length === 0 && this.playerDrawPile.length === 0) {
+                    this.gameActive = false;
+                    if (this.cpuInterval) {
+                        clearInterval(this.cpuInterval);
+                        this.cpuInterval = null;
+                    }
+                    const statusEl = document.getElementById('status');
+                    statusEl.textContent = 'You Win! 🎉';
+                    statusEl.classList.add('show');
+                } else if (this.cpuHand.length === 0 && this.cpuDrawPile.length === 0) {
+                    this.gameActive = false;
+                    if (this.cpuInterval) {
+                        clearInterval(this.cpuInterval);
+                        this.cpuInterval = null;
+                    }
+                    const statusEl = document.getElementById('status');
+                    statusEl.textContent = 'CPU Wins!';
+                    statusEl.classList.add('show');
+                }
+            }
+            
+            render() {
+                const playerHandEl = document.getElementById('playerHand');
+                const cpuHandEl = document.getElementById('cpuHand');
+                const pile1El = document.getElementById('pile1');
+                const pile2El = document.getElementById('pile2');
+                const draw1El = document.getElementById('draw1');
+                const draw2El = document.getElementById('draw2');
+                
+                playerHandEl.innerHTML = '';
+                this.playerHand.forEach(card => {
+                    const container = document.createElement('div');
+                    container.className = 'card-container';
+                    
+                    const cardEl = document.createElement('div');
+                    cardEl.className = 'card';
+                    cardEl.textContent = card.value + card.suit;
+                    cardEl.draggable = true;
+                    
+                    cardEl.ondragstart = (e) => {
+                        e.dataTransfer.effectAllowed = 'move';
+                        this.draggedCard = card;
+                        this.draggedCardElement = cardEl;
+                        
+                        // Create a custom drag image (clone of the card)
+                        const dragImage = cardEl.cloneNode(true);
+                        dragImage.style.position = 'absolute';
+                        dragImage.style.top = '-1000px';
+                        document.body.appendChild(dragImage);
+                        e.dataTransfer.setDragImage(dragImage, 60, 90);
+                        
+                        // Clean up the drag image after a short delay
+                        setTimeout(() => {
+                            document.body.removeChild(dragImage);
+                        }, 0);
+                        
+                        cardEl.classList.add('dragging');
+                        document.body.classList.add('dragging');
+                    };
+                    
+                    cardEl.ondrag = (e) => {
+                        if (e.clientX !== 0 && e.clientY !== 0) {
+                            this.mouseX = e.clientX;
+                            this.mouseY = e.clientY;
+                        }
+                    };
+                    
+                    cardEl.ondragend = (e) => {
+                        cardEl.classList.remove('dragging');
+                        document.body.classList.remove('dragging');
+                        
+                        // Use last known mouse position
+                        const x = this.mouseX || e.clientX;
+                        const y = this.mouseY || e.clientY;
+                        
+                        const closestPile = this.getClosestValidPile(this.draggedCard, x, y);
+                        
+                        if (closestPile) {
+                            const success = this.playCard(this.draggedCard, closestPile);
+                            if (success) {
+                                this.animatePile(closestPile);
+                            }
+                        }
+                        
+                        this.draggedCard = null;
+                        this.draggedCardElement = null;
+                        pile1El.classList.remove('drag-over');
+                        pile2El.classList.remove('drag-over');
+                    };
+                    
+                    const indicator = document.createElement('div');
+                    indicator.className = 'indicator';
+                    
+                    container.appendChild(indicator);
+                    container.appendChild(cardEl);
+                    playerHandEl.appendChild(container);
+                });
+                
+                cpuHandEl.innerHTML = '';
+                this.cpuHand.forEach((card, idx) => {
+                    const container = document.createElement('div');
+                    container.className = 'card-container';
+                    
+                    const cardEl = document.createElement('div');
+                    cardEl.className = 'card disabled';
+                    cardEl.textContent = card.value + card.suit;
+                    
+                    const indicator = document.createElement('div');
+                    indicator.className = 'indicator';
+                    indicator.textContent = '^';
+                    if (idx === this.cpuCardIndex) {
+                        indicator.classList.add('active');
+                    }
+                    
+                    container.appendChild(cardEl);
+                    container.appendChild(indicator);
+                    cpuHandEl.appendChild(container);
+                });
+                
+                // Update center piles - add visual feedback during drag
+                pile1El.className = 'card center-pile';
+                pile1El.textContent = this.pile1 ? this.pile1.value + this.pile1.suit : '';
+                pile1El.ondragover = (e) => {
+                    e.preventDefault();
+                    if (this.draggedCard && this.canPlay(this.draggedCard, this.pile1)) {
+                        pile1El.classList.add('drag-over');
+                    }
+                };
+                pile1El.ondragleave = () => {
+                    pile1El.classList.remove('drag-over');
+                };
+                
+                pile2El.className = 'card center-pile';
+                pile2El.textContent = this.pile2 ? this.pile2.value + this.pile2.suit : '';
+                pile2El.ondragover = (e) => {
+                    e.preventDefault();
+                    if (this.draggedCard && this.canPlay(this.draggedCard, this.pile2)) {
+                        pile2El.classList.add('drag-over');
+                    }
+                };
+                pile2El.ondragleave = () => {
+                    pile2El.classList.remove('drag-over');
+                };
+                
+                draw1El.textContent = this.centerDraw1.length > 0 ? 'DECK' : '';
+                draw2El.textContent = this.centerDraw2.length > 0 ? 'DECK' : '';
+            }
+        }
+        
+        const game = new SpeedGame();
+        
+        document.getElementById('startButton').onclick = () => {
+            document.getElementById('startMenu').style.display = 'none';
+            document.getElementById('gameContainer').classList.add('active');
+            game.start();
+        };
+        
+        document.getElementById('newGame').onclick = () => {
+            game.start();
+        };
+    </script>
+</body>
+</html>

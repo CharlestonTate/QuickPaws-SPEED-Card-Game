@@ -1,0 +1,3 @@
+ran into issues with cursors and file pathing.
+
+for now it's in src
