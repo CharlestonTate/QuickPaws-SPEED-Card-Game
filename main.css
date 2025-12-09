@@ -1,0 +1,29 @@
+/* main styles for the game canvas layer */
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    font-family: 'Times New Roman', sans-serif;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    min-height: 100vh;
+    background: white;
+    overflow: hidden;
+}
+
+#gameCanvas {
+    border: 4px solid #000;
+    background: white;
+    cursor: url('cursor_point.png'), auto;
+    border-radius: 20px;
+    /* i just really like this color */
+    /* border-color: skyblue; */
+}
+
+#gameCanvas.grabbing {
+    cursor: url('cursor_grab.png'), grabbing !important;
+}
